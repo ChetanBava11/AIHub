@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
 
 export const Route = createFileRoute("/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — OpsCRM" }] }),
+  head: () => ({ meta: [{ title: "Dashboard | AIHub" }] }),
   component: Dashboard,
 });
 
@@ -15,7 +15,7 @@ const kpis = [
 ];
 
 const activity = [
-  { time: "10:24 AM", text: "New opportunity created: Acme Co. — $12,000" },
+  { time: "10:24 AM", text: "New opportunity created: Acme Co. - $12,000" },
   { time: "09:55 AM", text: "Email received from Jane Doe (Globex)" },
   { time: "Yesterday", text: "Call logged with Michael Smith" },
   { time: "Yesterday", text: "Opportunity moved to Proposal: Initech" },
@@ -26,10 +26,10 @@ function Dashboard() {
   return (
     <AppShell title="Dashboard">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {kpis.map((k) => (
-          <div key={k.label} className="rounded border border-gray-200 bg-white p-4">
-            <div className="text-xs text-gray-500">{k.label}</div>
-            <div className="mt-1 text-2xl font-semibold">{k.value}</div>
+        {kpis.map((item) => (
+          <div key={item.label} className="rounded border border-gray-200 bg-white p-4">
+            <div className="text-xs text-gray-500">{item.label}</div>
+            <div className="mt-1 text-2xl font-semibold">{item.value}</div>
           </div>
         ))}
       </div>
@@ -40,10 +40,10 @@ function Dashboard() {
         </div>
         <table className="w-full text-sm">
           <tbody>
-            {activity.map((a, i) => (
-              <tr key={i} className="border-b border-gray-100 last:border-0">
-                <td className="w-32 px-4 py-2 text-gray-500">{a.time}</td>
-                <td className="px-4 py-2">{a.text}</td>
+            {activity.map((item, index) => (
+              <tr key={index} className="border-b border-gray-100 last:border-0">
+                <td className="w-32 px-4 py-2 text-gray-500">{item.time}</td>
+                <td className="px-4 py-2">{item.text}</td>
               </tr>
             ))}
           </tbody>

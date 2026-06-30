@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 
 export const Route = createFileRoute("/contacts")({
-  head: () => ({ meta: [{ title: "Contacts — OpsCRM" }] }),
+  head: () => ({ meta: [{ title: "Contacts | AIHub" }] }),
   component: Contacts,
 });
 
@@ -16,24 +16,54 @@ type Contact = {
   status: string;
 };
 
-const seed: Contact[] = [
-  { name: "Jane Doe", phone: "+1 555-2310", email: "jane@globex.com", company: "Globex", lastContacted: "2 days ago", status: "Active" },
-  { name: "Michael Smith", phone: "+1 555-7781", email: "mike@initech.com", company: "Initech", lastContacted: "Yesterday", status: "Active" },
-  { name: "Sarah Lee", phone: "+1 555-9921", email: "sarah@acme.com", company: "Acme Co.", lastContacted: "Today", status: "Lead" },
-  { name: "Raj Patel", phone: "+91 98100 22112", email: "raj@umbrella.io", company: "Umbrella", lastContacted: "1 week ago", status: "Inactive" },
+const seedContacts: Contact[] = [
+  {
+    name: "Jane Doe",
+    phone: "+1 555-2310",
+    email: "jane@globex.com",
+    company: "Globex",
+    lastContacted: "2 days ago",
+    status: "Active",
+  },
+  {
+    name: "Michael Smith",
+    phone: "+1 555-7781",
+    email: "mike@initech.com",
+    company: "Initech",
+    lastContacted: "Yesterday",
+    status: "Active",
+  },
+  {
+    name: "Sarah Lee",
+    phone: "+1 555-9921",
+    email: "sarah@acme.com",
+    company: "Acme Co.",
+    lastContacted: "Today",
+    status: "Lead",
+  },
+  {
+    name: "Raj Patel",
+    phone: "+91 98100 22112",
+    email: "raj@umbrella.io",
+    company: "Umbrella",
+    lastContacted: "1 week ago",
+    status: "Inactive",
+  },
 ];
 
 function Contacts() {
-  const [contacts, setContacts] = useState<Contact[]>(seed);
-  const [q, setQ] = useState("");
+  const [contacts, setContacts] = useState<Contact[]>(seedContacts);
+  const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
 
-  const filtered = useMemo(
+  const filteredContacts = useMemo(
     () =>
-      contacts.filter((c) =>
-        (c.name + c.email + c.company).toLowerCase().includes(q.toLowerCase()),
+      contacts.filter((contact) =>
+        (contact.name + contact.email + contact.company)
+          .toLowerCase()
+          .includes(query.toLowerCase()),
       ),
-    [contacts, q],
+    [contacts, query],
   );
 
   return (
@@ -41,8 +71,8 @@ function Contacts() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <input
           placeholder="Search contacts..."
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
           className="w-72 rounded border border-gray-300 px-3 py-2 text-sm"
         />
         <button
@@ -66,36 +96,36 @@ function Contacts() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((c, i) => (
-              <tr key={i} className="border-t border-gray-100">
-                <td className="px-4 py-2">{c.name}</td>
-                <td className="px-4 py-2">{c.phone}</td>
-                <td className="px-4 py-2">{c.email}</td>
-                <td className="px-4 py-2">{c.company}</td>
-                <td className="px-4 py-2 text-gray-600">{c.lastContacted}</td>
-                <td className="px-4 py-2">{c.status}</td>
+            {filteredContacts.map((contact, index) => (
+              <tr key={index} className="border-t border-gray-100">
+                <td className="px-4 py-2">{contact.name}</td>
+                <td className="px-4 py-2">{contact.phone}</td>
+                <td className="px-4 py-2">{contact.email}</td>
+                <td className="px-4 py-2">{contact.company}</td>
+                <td className="px-4 py-2 text-gray-600">{contact.lastContacted}</td>
+                <td className="px-4 py-2">{contact.status}</td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {filteredContacts.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
                   No contacts match.
                 </td>
               </tr>
-            )}
+            ) : null}
           </tbody>
         </table>
       </div>
 
-      {open && (
+      {open ? (
         <AddContactModal
           onClose={() => setOpen(false)}
-          onAdd={(c) => {
-            setContacts((prev) => [c, ...prev]);
+          onAdd={(contact) => {
+            setContacts((current) => [contact, ...current]);
             setOpen(false);
           }}
         />
-      )}
+      ) : null}
     </AppShell>
   );
 }
@@ -105,7 +135,7 @@ function AddContactModal({
   onAdd,
 }: {
   onClose: () => void;
-  onAdd: (c: Contact) => void;
+  onAdd: (contact: Contact) => void;
 }) {
   const [form, setForm] = useState<Contact>({
     name: "",
@@ -115,27 +145,28 @@ function AddContactModal({
     lastContacted: "Today",
     status: "Lead",
   });
-  const set = (k: keyof Contact) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm({ ...form, [k]: e.target.value });
+
+  const setField = (key: keyof Contact) => (event: React.ChangeEvent<HTMLInputElement>) =>
+    setForm({ ...form, [key]: event.target.value });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
+        onSubmit={(event) => {
+          event.preventDefault();
           onAdd(form);
         }}
         className="w-full max-w-md rounded border border-gray-200 bg-white p-5"
       >
         <h2 className="mb-3 text-base font-semibold">Add Contact</h2>
         <div className="space-y-2">
-          {(["name", "phone", "email", "company"] as const).map((f) => (
-            <div key={f}>
-              <label className="block text-xs text-gray-600 capitalize">{f}</label>
+          {(["name", "phone", "email", "company"] as const).map((field) => (
+            <div key={field}>
+              <label className="block text-xs text-gray-600 capitalize">{field}</label>
               <input
-                required={f === "name"}
-                value={form[f]}
-                onChange={set(f)}
+                required={field === "name"}
+                value={form[field]}
+                onChange={setField(field)}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
               />
             </div>

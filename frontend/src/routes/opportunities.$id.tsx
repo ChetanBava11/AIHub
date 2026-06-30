@@ -1,9 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "../components/AppShell";
 import { opportunities } from "./opportunities";
 
 export const Route = createFileRoute("/opportunities/$id")({
-  head: () => ({ meta: [{ title: "Opportunity — OpsCRM" }] }),
+  head: () => ({ meta: [{ title: "Opportunity | AIHub" }] }),
   component: OpportunityDetail,
 });
 
@@ -16,23 +16,26 @@ const timeline = [
 
 function OpportunityDetail() {
   const { id } = Route.useParams();
-  const opp = opportunities.find((o) => o.id === id);
-  if (!opp) {
+  const opportunity = opportunities.find((item) => item.id === id);
+
+  if (!opportunity) {
     return (
       <AppShell title="Opportunity">
         <p className="text-sm text-gray-600">
           Not found.{" "}
-          <Link to="/opportunities" className="text-blue-700 hover:underline">Back</Link>
+          <Link to="/opportunities" className="text-blue-700 hover:underline">
+            Back
+          </Link>
         </p>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title={opp.name}>
+    <AppShell title={opportunity.name}>
       <div className="mb-4">
         <Link to="/opportunities" className="text-sm text-blue-700 hover:underline">
-          ← Back to opportunities
+          Back to opportunities
         </Link>
       </div>
 
@@ -40,11 +43,16 @@ function OpportunityDetail() {
         <div className="rounded border border-gray-200 bg-white p-4">
           <h2 className="mb-2 text-sm font-semibold">Info</h2>
           <dl className="grid grid-cols-2 gap-y-1 text-sm">
-            <dt className="text-gray-500">Contact</dt><dd>{opp.contact}</dd>
-            <dt className="text-gray-500">Value</dt><dd>${opp.value.toLocaleString()}</dd>
-            <dt className="text-gray-500">Stage</dt><dd>{opp.stage}</dd>
-            <dt className="text-gray-500">Created</dt><dd>Jun 24, 2026</dd>
-            <dt className="text-gray-500">Expected close</dt><dd>Jul 15, 2026</dd>
+            <dt className="text-gray-500">Contact</dt>
+            <dd>{opportunity.contact}</dd>
+            <dt className="text-gray-500">Value</dt>
+            <dd>${opportunity.value.toLocaleString()}</dd>
+            <dt className="text-gray-500">Stage</dt>
+            <dd>{opportunity.stage}</dd>
+            <dt className="text-gray-500">Created</dt>
+            <dd>Jun 24, 2026</dd>
+            <dt className="text-gray-500">Expected close</dt>
+            <dd>Jul 15, 2026</dd>
           </dl>
         </div>
 
@@ -58,12 +66,14 @@ function OpportunityDetail() {
       </div>
 
       <div className="mt-4 rounded border border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-4 py-2 text-sm font-medium">Activity Timeline</div>
+        <div className="border-b border-gray-200 px-4 py-2 text-sm font-medium">
+          Activity Timeline
+        </div>
         <ul className="divide-y divide-gray-100 text-sm">
-          {timeline.map((t, i) => (
-            <li key={i} className="flex gap-4 px-4 py-2">
-              <span className="w-36 text-gray-500">{t.time}</span>
-              <span>{t.text}</span>
+          {timeline.map((item, index) => (
+            <li key={index} className="flex gap-4 px-4 py-2">
+              <span className="w-36 text-gray-500">{item.time}</span>
+              <span>{item.text}</span>
             </li>
           ))}
         </ul>

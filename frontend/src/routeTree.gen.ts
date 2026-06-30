@@ -9,9 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as OpportunitiesRouteImport } from './routes/opportunities'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactsRouteImport } from './routes/contacts'
@@ -19,6 +21,11 @@ import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OpportunitiesIdRouteImport } from './routes/opportunities.$id'
 
+const TasksRoute = TasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -32,6 +39,11 @@ const OpportunitiesRoute = OpportunitiesRouteImport.update({
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InboxRoute = InboxRouteImport.update({
@@ -71,9 +83,11 @@ export interface FileRoutesByFullPath {
   '/contacts': typeof ContactsRoute
   '/dashboard': typeof DashboardRoute
   '/inbox': typeof InboxRoute
+  '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/opportunities': typeof OpportunitiesRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/tasks': typeof TasksRoute
   '/opportunities/$id': typeof OpportunitiesIdRoute
 }
 export interface FileRoutesByTo {
@@ -82,9 +96,11 @@ export interface FileRoutesByTo {
   '/contacts': typeof ContactsRoute
   '/dashboard': typeof DashboardRoute
   '/inbox': typeof InboxRoute
+  '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/opportunities': typeof OpportunitiesRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/tasks': typeof TasksRoute
   '/opportunities/$id': typeof OpportunitiesIdRoute
 }
 export interface FileRoutesById {
@@ -94,9 +110,11 @@ export interface FileRoutesById {
   '/contacts': typeof ContactsRoute
   '/dashboard': typeof DashboardRoute
   '/inbox': typeof InboxRoute
+  '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/opportunities': typeof OpportunitiesRouteWithChildren
   '/settings': typeof SettingsRoute
+  '/tasks': typeof TasksRoute
   '/opportunities/$id': typeof OpportunitiesIdRoute
 }
 export interface FileRouteTypes {
@@ -107,9 +125,11 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/dashboard'
     | '/inbox'
+    | '/login'
     | '/onboarding'
     | '/opportunities'
     | '/settings'
+    | '/tasks'
     | '/opportunities/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -118,9 +138,11 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/dashboard'
     | '/inbox'
+    | '/login'
     | '/onboarding'
     | '/opportunities'
     | '/settings'
+    | '/tasks'
     | '/opportunities/$id'
   id:
     | '__root__'
@@ -129,9 +151,11 @@ export interface FileRouteTypes {
     | '/contacts'
     | '/dashboard'
     | '/inbox'
+    | '/login'
     | '/onboarding'
     | '/opportunities'
     | '/settings'
+    | '/tasks'
     | '/opportunities/$id'
   fileRoutesById: FileRoutesById
 }
@@ -141,13 +165,22 @@ export interface RootRouteChildren {
   ContactsRoute: typeof ContactsRoute
   DashboardRoute: typeof DashboardRoute
   InboxRoute: typeof InboxRoute
+  LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   OpportunitiesRoute: typeof OpportunitiesRouteWithChildren
   SettingsRoute: typeof SettingsRoute
+  TasksRoute: typeof TasksRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -167,6 +200,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inbox': {
@@ -232,10 +272,22 @@ const rootRouteChildren: RootRouteChildren = {
   ContactsRoute: ContactsRoute,
   DashboardRoute: DashboardRoute,
   InboxRoute: InboxRoute,
+  LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   OpportunitiesRoute: OpportunitiesRouteWithChildren,
   SettingsRoute: SettingsRoute,
+  TasksRoute: TasksRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
