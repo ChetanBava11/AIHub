@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { PageEmptyState, PageErrorState, PageLoadingState } from "../components/PageState";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import { getApiErrorMessage } from "../lib/api";
 import { contactService, type ContactInput, type ContactRecord } from "../services/contactService";
 
@@ -55,6 +57,7 @@ function Contacts() {
   const [query, setQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactRecord | null>(null);
+  const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
   const queryClient = useQueryClient();
 
   const contactsQuery = useQuery({
@@ -166,6 +169,13 @@ function Contacts() {
                   <div className="flex gap-2">
                     <button
                       type="button"
+                      onClick={() => setSelectedContact(contact)}
+                      className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
+                    >
+                      View
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setEditingContact(contact)}
                       className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50"
                     >
@@ -246,6 +256,56 @@ function Contacts() {
           });
         }}
       />
+
+      {selectedContact ? (
+        <div className="mt-4 rounded border border-gray-200 bg-white p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold">Contact Details</h2>
+              <p className="mt-1 text-sm text-gray-600">Lead score and messaging actions for the selected contact.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedContact(null)}
+              className="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50"
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-2 text-sm">
+              <div><span className="text-gray-500">Name:</span> {selectedContact.name}</div>
+              <div><span className="text-gray-500">Phone:</span> {selectedContact.phone}</div>
+              <div><span className="text-gray-500">Email:</span> {selectedContact.email ?? "-"}</div>
+              <div><span className="text-gray-500">Company:</span> {selectedContact.company ?? "-"}</div>
+              <div><span className="text-gray-500">Status:</span> {selectedContact.status}</div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Lead Score</div>
+                <Badge variant="outline">{selectedContact.leadScore ?? "N/A"}</Badge>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-gray-500">Lead Score Reason</div>
+                <p className="mt-1 text-sm text-gray-700">{selectedContact.leadScoreReason ?? "No score reason available yet."}</p>
+              </div>
+              <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                WhatsApp sending is prepared in the frontend, but the backend endpoint is still required.
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled
+                title="POST /whatsapp/send is not available yet on the backend."
+              >
+                Send WhatsApp
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AppShell>
   );
 }

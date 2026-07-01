@@ -45,7 +45,7 @@ Output:
 };
 
 const buildFollowUpPrompt = (
-  contact: CreateContactInput,
+  contact: { name: string; company?: string | null },
   score: number,
   reasoning: string,
   notes?: string | null
@@ -83,8 +83,8 @@ export class WorkflowService {
     const contact = await this.contactService.createContact(tenantId, userId, {
       name: input.name,
       phone: input.phone,
-      email: input.email ?? null,
-      company: input.company ?? null,
+      email: input.email ?? undefined,
+      company: input.company ?? undefined,
       status: "LEAD"
     });
 
@@ -124,7 +124,14 @@ export class WorkflowService {
     const actionsTaken: WorkflowAction[] = [];
 
     if (leadScoreResult.score > 80) {
-      const followUpMessage = await this.generateFollowUpMessage(contact, leadScoreResult, input.notes);
+      const followUpMessage = await this.generateFollowUpMessage(
+        {
+          name: contact.name,
+          company: contact.company ?? undefined
+        },
+        leadScoreResult,
+        input.notes
+      );
 
       const whatsappResult = await sendWhatsApp({
         tenantId,
@@ -255,7 +262,7 @@ export class WorkflowService {
   }
 
   private async generateFollowUpMessage(
-    contact: CreateContactInput,
+    contact: { name: string; company?: string | null },
     scoreResult: LeadScoreResult,
     notes?: string | null
   ): Promise<string> {

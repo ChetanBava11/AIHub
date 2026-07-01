@@ -8,6 +8,8 @@ export type ContactRecord = {
   email: string | null;
   company: string | null;
   status: string;
+  leadScore: number | null;
+  leadScoreReason: string | null;
   lastContactedAt: string | null;
   createdAt: string;
 };
@@ -32,6 +34,12 @@ export const contactService = {
     });
 
     return response.data.contacts;
+  },
+
+  async getContactById(id: string) {
+    const response = await api.get<{ contact: ContactRecord }>(`/contacts/${id}`);
+
+    return response.data.contact;
   },
 
   async createContact(payload: ContactInput) {

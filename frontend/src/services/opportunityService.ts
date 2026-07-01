@@ -22,6 +22,8 @@ export type OpportunityContact = {
   email: string | null;
   company: string | null;
   status: string;
+  leadScore: number | null;
+  leadScoreReason: string | null;
   lastContactedAt: string | null;
   createdAt: string;
 };

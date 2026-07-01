@@ -162,6 +162,8 @@ function ThreadView({
   conversation: InboxConversation;
   thread: InboxThread;
 }) {
+  const analysisAvailable = thread.aiSummary || thread.sentiment || thread.intent || thread.lastAnalyzedAt;
+
   return (
     <>
       <div className="border-b border-gray-200 p-3">
@@ -179,6 +181,14 @@ function ThreadView({
             <span className="text-gray-500">Latest Message:</span> {conversation.lastMessage.content}
           </div>
         </div>
+        {analysisAvailable ? (
+          <div className="mt-2 rounded border border-blue-100 bg-blue-50 p-2 text-xs">
+            <div><span className="text-gray-500">AI Summary:</span> {thread.aiSummary ?? "-"}</div>
+            <div><span className="text-gray-500">Sentiment:</span> {thread.sentiment ?? "-"}</div>
+            <div><span className="text-gray-500">Intent:</span> {thread.intent ?? "-"}</div>
+            <div><span className="text-gray-500">Last Analyzed:</span> {thread.lastAnalyzedAt ? formatMessageTime(thread.lastAnalyzedAt) : "-"}</div>
+          </div>
+        ) : null}
       </div>
       <div className="space-y-2 p-3">
         {thread.messages.map((message) => (

@@ -44,7 +44,5 @@ const aiMessageSchema = new Schema<AIMessageDocument>(
   }
 );
 
-aiMessageSchema.index({ conversationId: 1 });
-
 export const AIMessage =
   models.AIMessage || model<AIMessageDocument>("AIMessage", aiMessageSchema);

@@ -21,6 +21,10 @@ export type InboxConversation = {
 export type InboxThread = {
   contact: ContactRecord;
   messages: InboxMessageRecord[];
+  aiSummary?: string | null;
+  sentiment?: string | null;
+  intent?: string | null;
+  lastAnalyzedAt?: string | null;
 };
 
 export type InboxSeedResponse = {

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { AIConversation, type AIConversationDocument } from "../models/AIConversation";
 import { AIMessage, type AIMessageDocument, type AIMessageRole } from "../models/AIMessage";
@@ -383,7 +384,10 @@ Instructions: Keep answers concise. Always explain reasoning in one sentence. Wh
       tenantId,
       userId,
       action: "AI_TOOL_REQUESTED",
-      details: { tool: toolName, args }
+      details: {
+        tool: toolName,
+        args: JSON.parse(JSON.stringify(args))
+      } as Prisma.InputJsonValue
     });
 
     try {

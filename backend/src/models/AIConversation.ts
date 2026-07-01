@@ -32,9 +32,5 @@ const aiConversationSchema = new Schema<AIConversationDocument>(
   }
 );
 
-aiConversationSchema.index({ tenantId: 1 });
-aiConversationSchema.index({ userId: 1 });
-aiConversationSchema.index({ createdAt: -1 });
-
 export const AIConversation =
   models.AIConversation || model<AIConversationDocument>("AIConversation", aiConversationSchema);

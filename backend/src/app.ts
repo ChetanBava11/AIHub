@@ -13,6 +13,7 @@ import { createMeController } from "./controllers/meController";
 import { createTaskController } from "./controllers/taskController";
 import { createTenantController } from "./controllers/tenantController";
 import { createAIController } from "./controllers/aiController";
+import { createWorkflowController } from "./controllers/workflowController";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { buildAuthRouter } from "./routes/authRoutes";
 import { buildContactRouter } from "./routes/contact.routes";
