@@ -244,11 +244,6 @@ const readSseStream = async (
   return { conversationId, assistantText };
 };
 
-export type AIChatRequest = {
-  conversationId?: string;
-  message: string;
-};
-
 export const aiService = {
   async listConversations() {
     const response = await api.get<AIConversationListResponse>("/ai/conversations");

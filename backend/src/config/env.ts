@@ -15,7 +15,7 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL."),
   COOKIE_SECRET: z.string().min(16, "COOKIE_SECRET must be at least 16 characters."),
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default("gemini-1.0"),
+  GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   WHATSAPP_API_KEY: z.string().optional(),
   PHONE_NUMBER_ID: z.string().optional()
 });

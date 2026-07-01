@@ -6,7 +6,7 @@ import {
   createGeminiClient,
   type GeminiChatMessage,
   type GeminiClient,
-  streamChat,
+  streamGenerateContentEvents,
   geminiToolDefinitions
 } from "../lib/gemini";
 import { AppError } from "../lib/errors";
@@ -50,6 +50,14 @@ type ToolExecutionResult = {
   error?: string;
 };
 
+type ToolCallRecord = {
+  tool: ToolName;
+  arguments: Record<string, unknown>;
+  success: boolean;
+  result?: unknown;
+  error?: string;
+};
+
 type ToolExecutor = (
   tenantId: string,
   userId: string,
@@ -74,6 +82,28 @@ const preserveExplanation = (explanation?: string | null) =>
   explanation && explanation.trim()
     ? explanation.trim()
     : "Reason: I used CRM tools because they were required to answer your request accurately.";
+
+const MAX_TOOL_CALLS = 8;
+
+const TOOL_PROGRESS_MESSAGES: Record<ToolName, string> = {
+  searchContacts: "Searching contacts...",
+  createTask: "Creating task...",
+  updateOpportunity: "Updating opportunity...",
+  fetchBusinessMetrics: "Fetching dashboard metrics...",
+  sendWhatsApp: "Sending WhatsApp..."
+};
+
+const isToolName = (value: string): value is ToolName => {
+  return Object.prototype.hasOwnProperty.call(TOOL_PROGRESS_MESSAGES, value);
+};
+
+const getToolProgressMessage = (toolName: string) => {
+  if (isToolName(toolName)) {
+    return TOOL_PROGRESS_MESSAGES[toolName];
+  }
+
+  return `Executing ${toolName}...`;
+};
 
 const buildAssistantContent = (content: string, explanation?: string | null) => {
   const trimmed = content.trim();
@@ -276,75 +306,104 @@ Instructions: Keep answers concise. Always explain reasoning in one sentence. Wh
     streamEvent("streaming_started", { conversationId, tenantId });
 
     const stream = (async function* (self: AIService) {
-      let continueRunning = true;
-      let lastAssistantText = "";
+      let finalAssistantText = "";
+      let toolIterations = 0;
+      let completed = false;
 
-      while (continueRunning) {
-        const responseStream = streamChat(self.geminiClient, {
-          messages,
-          functionDefinitions: geminiToolDefinitions
-        });
+      try {
+        while (toolIterations < MAX_TOOL_CALLS) {
+          toolIterations += 1;
 
-        let responseText = "";
+          const responseStream = streamGenerateContentEvents(self.geminiClient, {
+            messages,
+            functionDefinitions: geminiToolDefinitions
+          });
 
-        for await (const chunk of responseStream) {
-          responseText += chunk;
-          streamEvent("assistant_chunk", { chunk });
+          let responseText = "";
+          let requestedToolCall: { name: string; args: Record<string, unknown>; id?: string } | null = null;
+
+          for await (const event of responseStream) {
+            if (event.type === "text") {
+              responseText += event.text;
+              streamEvent("assistant_chunk", { chunk: event.text });
+              continue;
+            }
+
+            if (!requestedToolCall) {
+              requestedToolCall = event.functionCall;
+            }
+          }
+
+          if (!requestedToolCall) {
+            finalAssistantText = responseText.trim();
+
+            if (!finalAssistantText) {
+              throw new AppError("Gemini response was empty.", 502);
+            }
+
+            completed = true;
+            break;
+          }
+
+          const toolName = requestedToolCall.name;
+          const toolArgs = requestedToolCall.args;
+
+          streamEvent("tool_progress", { tool: toolName, message: getToolProgressMessage(toolName) });
+          streamEvent("tool_call", { tool: toolName, status: `Executing ${toolName}...` });
+
+          const toolExecution = await self.executeToolCall(toolName, tenantId, userId, toolArgs);
+
+          const toolCallRecord: ToolCallRecord = toolExecution.success
+            ? { tool: toolName as ToolName, arguments: toolArgs, success: true, result: toolExecution.result }
+            : { tool: toolName as ToolName, arguments: toolArgs, success: false, error: toolExecution.error };
+
+          executedToolCalls.push(toolCallRecord);
+          await self.saveToolMessage(
+            conversationId,
+            toolName,
+            toolExecution.success ? `Executed ${toolName}.` : `Failed to execute ${toolName}.`,
+            toolExecution.success ? toolExecution.result : { error: toolExecution.error }
+          );
+
+          streamEvent("tool_result", {
+            tool: toolName,
+            success: toolExecution.success,
+            result: toolExecution.result,
+            error: toolExecution.error
+          });
+
+          messages.push({
+            role: "assistant",
+            content: JSON.stringify({ function_call: { name: toolName, arguments: toolArgs, id: requestedToolCall.id } })
+          });
+
+          messages.push({
+            role: "tool",
+            name: toolName,
+            content: JSON.stringify(toolExecution.success ? toolExecution.result : { error: toolExecution.error })
+          });
         }
 
-          const functionCallPayload = self.parseFunctionCall(responseText);
-
-        if (!functionCallPayload) {
-          lastAssistantText = responseText.trim();
-          continueRunning = false;
-          break;
+        if (!completed) {
+          throw new AppError("Gemini requested too many tool calls.", 502);
         }
-
-        const toolName = functionCallPayload.name;
-        const toolArgs = functionCallPayload.arguments as Record<string, unknown>;
-
-        streamEvent("tool_call", { tool: toolName, status: `Executing ${toolName}...` });
-
-        const toolExecution = await self.executeToolCall(toolName, tenantId, userId, toolArgs);
-
-        const toolCallRecord = toolExecution.success
-          ? { tool: toolName, arguments: toolArgs, result: toolExecution.result }
-          : { tool: toolName, arguments: toolArgs, result: { error: toolExecution.error } };
-
-        executedToolCalls.push(toolCallRecord);
-        await self.saveToolMessage(
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown streaming error.";
+        streamEvent("stream_error", { message });
+        streamEvent("streaming_completed", {
           conversationId,
-          toolName,
-          toolExecution.success ? `Executed ${toolName}.` : `Failed to execute ${toolName}.`,
-          toolExecution.success ? toolExecution.result : { error: toolExecution.error }
-        );
-
-        streamEvent("tool_result", {
-          tool: toolName,
-          success: toolExecution.success,
-          result: toolExecution.result,
-          error: toolExecution.error
+          toolCalls: executedToolCalls.length,
+          error: message
         });
-
-        messages.push({
-          role: "assistant",
-          content: JSON.stringify({ function_call: { name: toolName, arguments: toolArgs } })
-        });
-
-        messages.push({
-          role: "tool",
-          name: toolName,
-          content: JSON.stringify(toolExecution.success ? toolExecution.result : { error: toolExecution.error })
-        });
+        throw error;
       }
 
-      const explainedText = lastAssistantText;
-      streamEvent("assistant_final", { text: explainedText });
+      streamEvent("assistant_final", { text: finalAssistantText });
       streamEvent("streaming_completed", {
         conversationId,
         toolCalls: executedToolCalls.length
       });
-      yield explainedText;
+      yield finalAssistantText;
     })(this);
 
     return { stream, toolCalls: executedToolCalls };
@@ -412,41 +471,6 @@ Instructions: Keep answers concise. Always explain reasoning in one sentence. Wh
 
       return { tool: toolName as ToolName, args, success: false, error: message };
     }
-  }
-
-  private parseFunctionCall(responseText: string): { name: ToolName; arguments: unknown } | null {
-    const matches = responseText.match(/\{[\s\S]*?\}/g);
-    if (!matches) {
-      return null;
-    }
-
-    for (const candidate of matches) {
-      try {
-        const parsed = JSON.parse(candidate);
-        if (
-          parsed &&
-          typeof parsed === "object" &&
-          typeof (parsed as any).name === "string" &&
-          "arguments" in parsed
-        ) {
-          const name = (parsed as any).name as string;
-          const allowedTools: ToolName[] = [
-            "searchContacts",
-            "createTask",
-            "updateOpportunity",
-            "fetchBusinessMetrics",
-            "sendWhatsApp"
-          ];
-          if (allowedTools.includes(name as ToolName)) {
-            return { name: name as ToolName, arguments: parsed.arguments };
-          }
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    return null;
   }
 
   private toConversationRecord(conversation: AIConversationDocument): AIConversationRecord {
