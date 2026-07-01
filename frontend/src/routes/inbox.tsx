@@ -1,133 +1,205 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
+import { PageEmptyState, PageErrorState, PageLoadingState } from "../components/PageState";
+import { getApiErrorMessage } from "../lib/api";
+import { inboxService, type InboxConversation, type InboxMessageRecord, type InboxThread } from "../services/inboxService";
 
 export const Route = createFileRoute("/inbox")({
   head: () => ({ meta: [{ title: "Inbox | AIHub" }] }),
   component: Inbox,
 });
 
-type Message = { from: "them" | "me"; text: string; time: string };
-type Conversation = {
-  id: string;
-  name: string;
-  channel: "WhatsApp" | "Email" | "Call";
-  preview: string;
-  sentiment: "Positive" | "Negative" | "Neutral";
-  intent: string;
-  nextAction: string;
-  messages: Message[];
-};
-
-const conversations: Conversation[] = [
-  {
-    id: "1",
-    name: "Sarah Lee",
-    channel: "WhatsApp",
-    preview: "Sounds good, send the proposal",
-    sentiment: "Positive",
-    intent: "Requesting proposal",
-    nextAction: "Send proposal v1 today",
-    messages: [
-      { from: "them", text: "Hi! Can you share more details on pricing?", time: "9:10" },
-      { from: "me", text: "Sure - sending a one-pager shortly.", time: "9:12" },
-      { from: "them", text: "Sounds good, send the proposal", time: "9:14" },
-    ],
-  },
-  {
-    id: "2",
-    name: "Michael Smith",
-    channel: "Email",
-    preview: "We need to push the meeting...",
-    sentiment: "Neutral",
-    intent: "Reschedule meeting",
-    nextAction: "Offer 3 new time slots",
-    messages: [{ from: "them", text: "We need to push the meeting to next week.", time: "Mon" }],
-  },
-  {
-    id: "3",
-    name: "Raj Patel",
-    channel: "Call",
-    preview: "Voicemail (1:23)",
-    sentiment: "Negative",
-    intent: "Support escalation",
-    nextAction: "Call back within 1 hour",
-    messages: [{ from: "them", text: "Left a voicemail - issue with billing.", time: "Tue" }],
-  },
-];
+const formatMessageTime = (value: string) =>
+  new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 
 function Inbox() {
-  const [selectedId, setSelectedId] = useState(conversations[0].id);
-  const conversation = conversations.find((item) => item.id === selectedId) ?? conversations[0];
+  const queryClient = useQueryClient();
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+
+  const conversationsQuery = useQuery({
+    queryKey: ["inbox"],
+    queryFn: () => inboxService.listConversations(),
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: () => inboxService.seedDemoData(),
+    onSuccess: async () => {
+      toast.success("Demo inbox data seeded.");
+      await queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error, "We could not seed demo inbox data.")),
+  });
+
+  const conversations = conversationsQuery.data ?? [];
+
+  useEffect(() => {
+    if (!selectedContactId && conversations[0]) {
+      setSelectedContactId(conversations[0].contact.id);
+    }
+  }, [conversations, selectedContactId]);
+
+  const threadQuery = useQuery({
+    queryKey: ["inbox", selectedContactId],
+    queryFn: () => inboxService.getConversation(selectedContactId ?? ""),
+    enabled: Boolean(selectedContactId),
+  });
+
+  const selectedConversation = useMemo(
+    () => conversations.find((conversation) => conversation.contact.id === selectedContactId) ?? null,
+    [conversations, selectedContactId],
+  );
+
+  if (conversationsQuery.isLoading) {
+    return (
+      <AppShell title="Inbox">
+        <PageLoadingState title="Loading inbox" description="Fetching live conversations from the backend." />
+      </AppShell>
+    );
+  }
+
+  if (conversationsQuery.isError) {
+    return (
+      <AppShell title="Inbox">
+        <PageErrorState
+          title="Inbox unavailable"
+          description="We could not load your conversations right now."
+          actionLabel="Retry"
+          onAction={() => conversationsQuery.refetch()}
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="Inbox">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded border border-gray-200 bg-white">
-          <div className="border-b border-gray-200 px-3 py-2 text-sm font-medium">
-            Conversations
-          </div>
-          <ul>
-            {conversations.map((item) => (
-              <li key={item.id}>
-                <button
-                  onClick={() => setSelectedId(item.id)}
-                  className={
-                    "block w-full border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50 " +
-                    (item.id === selectedId ? "bg-blue-50" : "")
-                  }
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{item.name}</span>
-                    <span className="text-xs text-gray-500">[{item.channel}]</span>
-                  </div>
-                  <div className="truncate text-xs text-gray-600">{item.preview}</div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => void seedMutation.mutateAsync()}
+          disabled={seedMutation.isPending}
+          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {seedMutation.isPending ? "Seeding..." : "Seed Demo Data"}
+        </button>
+      </div>
 
-        <div className="rounded border border-gray-200 bg-white md:col-span-2">
-          <div className="border-b border-gray-200 p-3">
-            <div className="text-sm font-medium">
-              {conversation.name} - {conversation.channel}
+      {conversations.length === 0 ? (
+        <PageEmptyState
+          title="Inbox is empty"
+          description="Seed demo conversations or wait for live messages to arrive."
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded border border-gray-200 bg-white">
+            <div className="border-b border-gray-200 px-3 py-2 text-sm font-medium">
+              Conversations
             </div>
-            <div className="mt-2 rounded border border-gray-200 bg-gray-50 p-2 text-xs">
-              <div>
-                <span className="text-gray-500">Sentiment:</span> {conversation.sentiment}
-              </div>
-              <div>
-                <span className="text-gray-500">Intent:</span> {conversation.intent}
-              </div>
-              <div>
-                <span className="text-gray-500">Recommended Next Action:</span>{" "}
-                {conversation.nextAction}
-              </div>
-            </div>
+            <ul>
+              {conversations.map((item) => (
+                <li key={item.contact.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedContactId(item.contact.id)}
+                    className={
+                      "block w-full border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-gray-50 " +
+                      (item.contact.id === selectedContactId ? "bg-blue-50" : "")
+                    }
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{item.contact.name}</span>
+                      <span className="text-xs text-gray-500">[{item.lastMessage.channel}]</span>
+                    </div>
+                    <div className="truncate text-xs text-gray-600">{item.lastMessage.content}</div>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="space-y-2 p-3">
-            {conversation.messages.map((message, index) => (
-              <div
-                key={index}
-                className={"flex " + (message.from === "me" ? "justify-end" : "justify-start")}
-              >
-                <div
-                  className={
-                    "max-w-[70%] rounded border px-3 py-2 text-sm " +
-                    (message.from === "me"
-                      ? "border-blue-200 bg-blue-50"
-                      : "border-gray-200 bg-gray-50")
-                  }
-                >
-                  <div>{message.text}</div>
-                  <div className="mt-1 text-[10px] text-gray-500">{message.time}</div>
-                </div>
+
+          <div className="rounded border border-gray-200 bg-white md:col-span-2">
+            {threadQuery.isLoading ? (
+              <div className="p-4">
+                <PageLoadingState title="Loading thread" description="Fetching the selected conversation." />
               </div>
-            ))}
+            ) : threadQuery.isError ? (
+              <div className="p-4">
+                <PageErrorState
+                  title="Conversation unavailable"
+                  description="We could not load this conversation."
+                  actionLabel="Retry"
+                  onAction={() => threadQuery.refetch()}
+                />
+              </div>
+            ) : selectedConversation && threadQuery.data ? (
+              <ThreadView conversation={selectedConversation} thread={threadQuery.data} />
+            ) : (
+              <div className="p-4">
+                <PageEmptyState
+                  title="Select a conversation"
+                  description="Choose a contact from the list to view the thread."
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </AppShell>
+  );
+}
+
+function ThreadView({
+  conversation,
+  thread,
+}: {
+  conversation: InboxConversation;
+  thread: InboxThread;
+}) {
+  return (
+    <>
+      <div className="border-b border-gray-200 p-3">
+        <div className="text-sm font-medium">
+          {thread.contact.name} - {conversation.lastMessage.channel}
+        </div>
+        <div className="mt-2 rounded border border-gray-200 bg-gray-50 p-2 text-xs">
+          <div>
+            <span className="text-gray-500">Email:</span> {thread.contact.email ?? "-"}
+          </div>
+          <div>
+            <span className="text-gray-500">Company:</span> {thread.contact.company ?? "-"}
+          </div>
+          <div>
+            <span className="text-gray-500">Latest Message:</span> {conversation.lastMessage.content}
           </div>
         </div>
       </div>
-    </AppShell>
+      <div className="space-y-2 p-3">
+        {thread.messages.map((message) => (
+          <div
+            key={`${message.createdAt}-${message.content}`}
+            className={"flex " + (message.direction === "out" ? "justify-end" : "justify-start")}
+          >
+            <div
+              className={
+                "max-w-[70%] rounded border px-3 py-2 text-sm " +
+                (message.direction === "out"
+                  ? "border-blue-200 bg-blue-50"
+                  : "border-gray-200 bg-gray-50")
+              }
+            >
+              <div>{message.content}</div>
+              <div className="mt-1 text-[10px] text-gray-500">{formatMessageTime(message.createdAt)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
