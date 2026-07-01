@@ -13,7 +13,11 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET is required."),
   GOOGLE_REDIRECT_URI: z.string().url("GOOGLE_REDIRECT_URI must be a valid URL."),
   FRONTEND_URL: z.string().url("FRONTEND_URL must be a valid URL."),
-  COOKIE_SECRET: z.string().min(16, "COOKIE_SECRET must be at least 16 characters.")
+  COOKIE_SECRET: z.string().min(16, "COOKIE_SECRET must be at least 16 characters."),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().default("gemini-1.0"),
+  WHATSAPP_API_KEY: z.string().optional(),
+  PHONE_NUMBER_ID: z.string().optional()
 });
 
 export const env = envSchema.parse(process.env);

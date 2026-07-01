@@ -83,6 +83,8 @@ model Contact {
   email           String?
   company         String?
   status          String
+  leadScore       Int?
+  leadScoreReason String?
   lastContactedAt DateTime?
   createdAt       DateTime      @default(now())
   // Contact rows belong to a single tenant and should disappear with that tenant.

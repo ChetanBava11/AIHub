@@ -6,7 +6,7 @@ const revenueFromOpportunities = (opportunities: Array<{ value: Prisma.Decimal }
 
 export class DashboardService {
   async getKpis(tenantId: string) {
-    const [opportunities, pendingTasks, contacts] = await Promise.all([
+    const [opportunities, pendingTasks, contacts, aiAlertsCount] = await Promise.all([
       scopedPrisma(tenantId).opportunity.findMany({
         where: {
           stage: {
@@ -19,7 +19,18 @@ export class DashboardService {
           completed: false
         }
       }),
-      scopedPrisma(tenantId).contact.count()
+      scopedPrisma(tenantId).contact.count(),
+      scopedPrisma(tenantId).opportunity.count({
+        where: {
+          stage: "NEW",
+          contact: {
+            OR: [
+              { lastContactedAt: { lt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) } },
+              { lastContactedAt: null }
+            ]
+          }
+        }
+      })
     ]);
 
     return {
@@ -27,8 +38,7 @@ export class DashboardService {
       revenuePipelineSum: revenueFromOpportunities(opportunities),
       pendingFollowupsCount: pendingTasks.length,
       customerActivityCount: contacts,
-      aiAlertsCount: 0
-      // TODO: Phase 3 will compute AI alerts from inbox intelligence and scoring.
+      aiAlertsCount
     };
   }
 }

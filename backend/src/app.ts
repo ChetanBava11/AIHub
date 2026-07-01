@@ -12,6 +12,7 @@ import { createOpportunityController } from "./controllers/opportunityController
 import { createMeController } from "./controllers/meController";
 import { createTaskController } from "./controllers/taskController";
 import { createTenantController } from "./controllers/tenantController";
+import { createAIController } from "./controllers/aiController";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { buildAuthRouter } from "./routes/authRoutes";
 import { buildContactRouter } from "./routes/contact.routes";
@@ -21,6 +22,8 @@ import { buildOpportunityRouter } from "./routes/opportunity.routes";
 import { buildTaskRouter } from "./routes/task.routes";
 import { buildMeRouter } from "./routes/meRoutes";
 import { buildTenantRouter } from "./routes/tenantRoutes";
+import { buildAIRouter } from "./routes/ai.routes";
+import { buildWorkflowRouter } from "./routes/workflow.routes";
 import { ContactService } from "./services/contactService";
 import { AuthService } from "./services/authService";
 import { PrismaAuthRepository } from "./services/authRepository";
@@ -29,6 +32,8 @@ import { InboxService } from "./services/inboxService";
 import { OpportunityService } from "./services/opportunityService";
 import { TaskService } from "./services/taskService";
 import { TenantService } from "./services/tenantService";
+import { AIService } from "./services/aiService";
+import { WorkflowService } from "./services/workflowService";
 
 export interface AppServices {
   authService: AuthService;
@@ -38,11 +43,13 @@ export interface AppServices {
   opportunityService: OpportunityService;
   taskService: TaskService;
   tenantService: TenantService;
+  aiService: AIService;
 }
 
 export const createDefaultServices = (): AppServices => {
   const authRepository = new PrismaAuthRepository();
   const authService = new AuthService(authRepository);
+  const aiService = new AIService();
   const contactService = new ContactService();
   const inboxService = new InboxService();
   const dashboardService = new DashboardService();
@@ -57,7 +64,8 @@ export const createDefaultServices = (): AppServices => {
     inboxService,
     opportunityService,
     taskService,
-    tenantService
+    tenantService,
+    aiService
   };
 };
 
@@ -92,6 +100,9 @@ export const createApp = (services: AppServices = createDefaultServices()) => {
   const taskController = createTaskController(services.taskService);
   const tenantController = createTenantController(services.tenantService);
   const meController = createMeController(services.authService);
+  const workflowService = new WorkflowService();
+  const workflowController = createWorkflowController(workflowService);
+  const aiController = createAIController(services.aiService);
 
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
@@ -105,6 +116,8 @@ export const createApp = (services: AppServices = createDefaultServices()) => {
   app.use("/tasks", buildTaskRouter(taskController));
   app.use("/tenant", buildTenantRouter(tenantController));
   app.use("/me", buildMeRouter(meController));
+  app.use("/ai", buildAIRouter(aiController));
+  app.use("/workflows", buildWorkflowRouter(workflowController));
 
   app.use(notFoundHandler);
   app.use(errorHandler);

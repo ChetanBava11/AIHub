@@ -118,6 +118,30 @@ This keeps refresh tokens single-use and makes replay detectable.
 - `POST /inbox/seed-demo-data`
 - `GET /dashboard/kpis`
 
+## AI Tools
+
+The backend now includes tenant-scoped AI tool modules for Sprint 9A and Sprint 9B.
+
+- `searchContacts` searches up to 10 tenant contacts by name, phone, email, or company.
+- `createTask` creates a tenant task for a validated contact and due date.
+- `updateOpportunity` updates an opportunity stage, optional value, and stores `aiNextBestAction`.
+- `fetchBusinessMetrics` reuses `DashboardService.getKpis()` and returns tenant-scoped KPI numbers.
+- `sendWhatsApp` is intentionally mocked for Sprint 9B and only simulates message delivery.
+
+All tools use `scopedPrisma(tenantId)` or tenant-scoped services to enforce tenant isolation and write audit entries via `logAudit`.
+
+Tool audit details:
+
+- `AI_TOOL_SEARCH_CONTACTS` logs `{ query, resultCount }`
+- `AI_TOOL_CREATE_TASK` logs `{ contactId, taskId, dueDate }`
+- `AI_TOOL_UPDATE_OPPORTUNITY` logs `{ opportunityId, previousStage, newStage, updatedValue }`
+- `AI_TOOL_FETCH_BUSINESS_METRICS` logs `{ requestedBy: userId }`
+- `AI_TOOL_SEND_WHATSAPP` logs `{ contactId, messageLength, mockMode: true }`
+
+`sendWhatsApp` uses a placeholder service in `src/services/whatsapp.ts`.
+It logs a mock delivery message and returns `{ success: true, mock: true, timestamp: new Date() }`.
+This file is the only place that must change when replacing the mock with a real Meta Cloud API implementation.
+
 ## Testing
 
 The Jest + Supertest suite covers:
