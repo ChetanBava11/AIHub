@@ -13,14 +13,25 @@ enum UserRole {
   MEMBER
 }
 
+enum OpportunityStage {
+  NEW
+  QUALIFIED
+  PROPOSAL
+  WON
+  LOST
+}
+
 model Tenant {
-  id        String     @id @default(cuid())
-  name      String?
-  industry  String?
-  size      String?
-  createdAt DateTime   @default(now())
-  users     User[]
-  auditLogs AuditLog[]
+  id            String        @id @default(cuid())
+  name          String?
+  industry      String?
+  size          String?
+  createdAt     DateTime      @default(now())
+  users         User[]
+  auditLogs     AuditLog[]
+  contacts      Contact[]
+  opportunities Opportunity[]
+  tasks         Task[]
 }
 
 model User {
@@ -62,4 +73,56 @@ model AuditLog {
 
   @@index([tenantId])
   @@index([tenantId, createdAt])
+}
+
+model Contact {
+  id              String        @id @default(cuid())
+  tenantId        String
+  name            String
+  phone           String
+  email           String?
+  company         String?
+  status          String
+  lastContactedAt DateTime?
+  createdAt       DateTime      @default(now())
+  // Contact rows belong to a single tenant and should disappear with that tenant.
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  opportunities   Opportunity[]
+  tasks           Task[]
+
+  @@index([tenantId])
+}
+
+model Opportunity {
+  id               String           @id @default(cuid())
+  tenantId         String
+  contactId        String
+  title            String
+  value            Decimal          @db.Decimal(12, 2)
+  stage            OpportunityStage @default(NEW)
+  aiNextBestAction String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  // Opportunities are tenant-scoped and can safely cascade on tenant deletion.
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Contact deletion is restricted so open CRM history is not orphaned accidentally.
+  contact          Contact          @relation(fields: [contactId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  tenantId    String
+  contactId   String?
+  description String
+  dueDate     DateTime
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  // Tasks are tenant-owned records, so tenant cleanup can cascade safely.
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Tasks may outlive contact linkage, so the relation is optional and set null on delete.
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
 }
