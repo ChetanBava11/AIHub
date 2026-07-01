@@ -1,70 +1,95 @@
-# Backend Phase 1 Foundation
+# Backend Phase 2
 
-This folder contains Phase 1 of the backend for a multi-tenant AI Business Operations Platform. In this phase we only build the foundation: Express + TypeScript setup, PostgreSQL schema, MongoDB connection scaffold, Google OAuth with PKCE, JWT auth, refresh token rotation, tenant onboarding, and the initial automated tests.
+This folder contains the backend for a multi-tenant AI Business Operations Platform. The current phase includes the foundation from Phase 1 plus the CRM modules, unified inbox, and dashboard KPI aggregation that complete Phase 2.
 
-## Run locally
+## Architecture
 
-1. Copy `.env.example` to `.env` and fill in the secrets plus Google OAuth values.
-2. Start local databases from the repo root:
+The backend is an Express + TypeScript app built around a simple route → controller → service → database flow.
+
+- PostgreSQL and Prisma store the core CRM data: tenants, users, contacts, opportunities, tasks, refresh tokens, and audit logs.
+- MongoDB and Mongoose store inbox messages because message threads are document-shaped and can grow independently of the relational CRM models.
+- `requireAuth` is the tenant boundary. It verifies the access token cookie and attaches `{ userId, tenantId }` to `req.auth`.
+- Every tenant-aware query must use `req.auth.tenantId`. Controllers and services never trust tenant data from the request body, query string, or headers.
+
+## Local Setup
+
+1. Copy `.env.example` to `.env` and fill in the required values.
+2. Start PostgreSQL and MongoDB from the repo root:
 
 ```bash
 docker compose up -d
 ```
 
-3. Install dependencies:
+3. Install backend dependencies:
 
 ```bash
 npm install
 ```
 
-4. Generate the Prisma client and run the first migration:
+4. Generate Prisma Client and apply the database schema:
 
 ```bash
 npm run prisma:generate
 npm run prisma:migrate:dev -- --name init
 ```
 
-5. Start the API:
+5. Start the API in watch mode:
 
 ```bash
 npm run dev
 ```
 
-The API exposes `GET /health` for a quick liveness check.
+The health check is available at `GET /health`.
 
-## OAuth + PKCE flow
+## Required Environment Variables
+
+The backend expects these values in `.env`:
+
+- `DATABASE_URL`
+- `MONGO_URL`
+- `JWT_SECRET`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI`
+- `FRONTEND_URL`
+- `COOKIE_SECRET`
+
+`NODE_ENV` and `PORT` are optional.
+
+## OAuth + PKCE Flow
 
 1. The frontend calls `GET /auth/google/init`.
 2. The backend generates a high-entropy `code_verifier`, derives a SHA-256 `code_challenge`, and stores the verifier in a short-lived signed cookie.
-3. The backend also stores a signed `state` cookie to bind the callback to the same browser session.
+3. The backend also stores a signed `state` cookie so the callback stays bound to the same browser session.
 4. The backend returns the Google consent URL containing the `code_challenge`.
 5. The browser is redirected to Google.
 6. Google redirects back to `GET /auth/google/callback` with `code` and `state`.
-7. The backend reads the signed verifier cookie, validates `state`, and exchanges the code for Google tokens.
-8. The backend fetches the Google profile, finds or creates the local `Tenant` and `User`, then issues the app session cookies.
-9. The backend redirects to `FRONTEND_URL` with `auth=success` plus `onboarding_required=true|false`.
+7. The backend validates the state, reads the verifier cookie, and exchanges the code for Google tokens.
+8. The backend fetches the Google profile, finds or creates the local tenant and user, then issues the app session cookies.
+9. The backend redirects to `FRONTEND_URL` with `auth=success` and `onboarding_required=true|false`.
 
-The redirect query parameter is only a convenience flag. The frontend can always call `GET /me` after redirect to confirm the final login and onboarding state.
+The redirect flag is only a convenience. The frontend can always call `GET /me` after login to confirm the final session state.
 
-## Refresh rotation + reuse detection
+## Refresh Rotation
 
 1. Login issues a 15 minute JWT access token and a 7 day opaque refresh token.
-2. Only the hash of the refresh token is stored in PostgreSQL. The raw token never leaves the cookie.
-3. When `POST /auth/refresh` is called, the backend hashes the incoming refresh token and looks it up in the database.
-4. If the token is missing, expired, or otherwise invalid, the request is rejected with `401`.
-5. If the token exists and is already marked `used`, the backend treats that as refresh token reuse. This is a strong signal that the token may have been copied or stolen.
-6. On reuse detection, the backend revokes all refresh tokens for that user and returns `401`, forcing a clean login.
-7. If the token is valid and unused, the backend atomically marks it as used, creates a brand-new refresh token, and sends both fresh cookies back to the browser.
+2. Only the hash of the refresh token is stored in PostgreSQL.
+3. `POST /auth/refresh` hashes the incoming token and looks it up in the database.
+4. Missing, expired, or invalid tokens are rejected with `401`.
+5. If an already-used refresh token is replayed, the backend revokes all refresh tokens for that user and forces a clean login.
+6. Valid unused refresh tokens are rotated atomically.
 
-This design means a refresh token is single-use. Replay of an old refresh token becomes detectable instead of silently creating parallel sessions.
+This keeps refresh tokens single-use and makes replay detectable.
 
-## Tenant isolation pattern
+## Phase 2 Modules
 
-`requireAuth` is the boundary that establishes tenant context. It reads the signed access token cookie, verifies the JWT, and attaches `{ userId, tenantId }` to `req.auth`.
+- Contacts: tenant-scoped CRM contact records.
+- Opportunities: tenant-scoped pipeline records with stage and value tracking.
+- Tasks: tenant-scoped follow-up tasks.
+- Unified inbox: Mongo-backed message threads grouped by contact, with full per-contact timelines and demo seeding for local development.
+- Dashboard: KPI aggregation for active opportunities, revenue pipeline, pending follow-ups, customer activity, and an `aiAlertsCount` placeholder currently set to `0`.
 
-Future controllers must never trust `tenantId` from request body params, query params, headers, or frontend state. Every tenant-aware query should use `req.auth.tenantId` only. That keeps cross-tenant data access from being possible through request tampering.
-
-## API overview
+## API Overview
 
 - `GET /health`
 - `GET /auth/google/init`
@@ -73,13 +98,39 @@ Future controllers must never trust `tenantId` from request body params, query p
 - `POST /auth/logout`
 - `GET /me`
 - `PUT /tenant/onboarding`
+- `GET /contacts`
+- `POST /contacts`
+- `GET /contacts/:id`
+- `PUT /contacts/:id`
+- `DELETE /contacts/:id`
+- `GET /opportunities`
+- `POST /opportunities`
+- `GET /opportunities/:id`
+- `PUT /opportunities/:id`
+- `DELETE /opportunities/:id`
+- `GET /tasks`
+- `POST /tasks`
+- `GET /tasks/:id`
+- `PUT /tasks/:id`
+- `DELETE /tasks/:id`
+- `GET /inbox`
+- `GET /inbox/:contactId`
+- `POST /inbox/seed-demo-data`
+- `GET /dashboard/kpis`
 
 ## Testing
 
-The included Jest + Supertest suite covers:
+The Jest + Supertest suite covers:
 
-- `requireAuth` rejecting missing and invalid or expired access tokens
-- refresh token rotation
-- refresh token reuse detection revoking the session
+- `requireAuth` rejecting missing, invalid, and expired access tokens
+- refresh token rotation and reuse detection
+- contacts, opportunities, and tasks CRUD
+- unified inbox listing, thread retrieval, demo seeding, and tenant isolation
+- dashboard KPI aggregation and tenant isolation
 
-Use `.env.test.example` as the starting point for a dedicated test configuration if you later add database-backed integration tests.
+For local verification, run:
+
+```bash
+npm test
+npm run build
+```

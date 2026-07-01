@@ -14,7 +14,10 @@ export const updateTaskSchema = createTaskSchema.partial().refine((value) => Obj
 export const queryTaskSchema = z.object({
   id: z.string().trim().min(1).optional(),
   contactId: z.string().trim().min(1).optional(),
-  completed: z.coerce.boolean().optional(),
+  completed: z
+    .union([z.literal("true"), z.literal("false"), z.boolean()])
+    .transform((value) => value === true || value === "true")
+    .optional(),
   dueBefore: z.coerce.date().optional(),
   dueAfter: z.coerce.date().optional(),
   page: z.coerce.number().int().positive().default(1),
